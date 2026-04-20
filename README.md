@@ -23,7 +23,7 @@ Use cases:
 
 The contract was successfully deployed to Stellar Testnet. You can verify the deployment transaction on StellarExpert:
 
-![Deployment Transaction on StellarExpert](https://raw.githubusercontent.com/naufalbintang/prediction-capsule-naufalbintang/main/screenshot.png)
+![Deployment Transaction on StellarExpert](https://raw.githubusercontent.com/naufalbintang/prediction-capsule-naufalbintang/main/testnet.png)
 
 > Transaction processed on **2026-04-20 03:56:33 UTC** · Ledger `2130440` · Fee charged `0.0019692 XLM`
 
