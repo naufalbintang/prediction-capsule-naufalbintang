@@ -19,6 +19,16 @@ Use cases:
 
 ---
 
+## ✅ Deployment
+
+The contract was successfully deployed to Stellar Testnet. You can verify the deployment transaction on StellarExpert:
+
+![Deployment Transaction on StellarExpert](https://raw.githubusercontent.com/naufalbintang/prediction-capsule-naufalbintang/main/screenshot.png)
+
+> Transaction processed on **2026-04-20 03:56:33 UTC** · Ledger `2130440` · Fee charged `0.0019692 XLM`
+
+---
+
 ## 📦 Data Structures
 
 ### `Prediction`
@@ -61,7 +71,7 @@ Submit a new time-locked prediction.
 **Notes:**
 - Requires auth from `owner`
 - `unlock_time` must be greater than the current ledger timestamp
-- Content is stored encrypted on-chain and only revealed after `unlock_time`
+- Content is stored on-chain and only revealed after `unlock_time`
 
 ---
 
@@ -184,6 +194,7 @@ contracts/
 Cargo.toml
 Makefile
 README.md
+screenshot.png
 ```
 
 ---
