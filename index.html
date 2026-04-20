@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prediction Capsule</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #060910;
+    --surface: #0b1018;
+    --border: #1a2535;
+    --border-glow: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --text: #c8d8e8;
+    --text-dim: #4a6070;
+    --text-bright: #eaf4ff;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* SCANLINE */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* NOISE */
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* GLOW ORBS */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 { width: 500px; height: 500px; background: rgba(0,212,255,0.06); top: -100px; left: -100px; }
+  .orb-2 { width: 400px; height: 400px; background: rgba(255,107,53,0.05); bottom: 100px; right: -50px; }
+  .orb-3 { width: 300px; height: 300px; background: rgba(127,255,107,0.04); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 32px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .logo-tag {
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .logo-title {
+    font-family: var(--sans);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-bright);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-title span { color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .contract-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    letter-spacing: 1px;
+  }
+
+  .contract-badge span {
+    color: var(--accent);
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    z-index: 10;
+    padding: 80px 48px 60px;
+    max-width: 900px;
+  }
+
+  .hero-label {
+    font-size: 10px;
+    letter-spacing: 6px;
+    color: var(--accent2);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+
+  .hero-title {
+    font-family: var(--sans);
+    font-size: clamp(42px, 6vw, 80px);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-bright);
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+  }
+
+  .hero-title .line2 {
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(0,212,255,0.4);
+  }
+
+  .hero-desc {
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--text-dim);
+    max-width: 520px;
+    border-left: 2px solid var(--border-glow);
+    padding-left: 20px;
+    margin-bottom: 40px;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* BUTTONS */
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 14px 28px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: bold;
+  }
+
+  .btn-primary:hover {
+    background: #33ddff;
+    box-shadow: 0 0 30px rgba(0,212,255,0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: inset 0 0 20px rgba(0,212,255,0.05);
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px 80px;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 32px;
+    max-width: 1300px;
+  }
+
+  /* PANEL */
+  .panel {
+    border: 1px solid var(--border);
+    background: rgba(11,16,24,0.8);
+    backdrop-filter: blur(10px);
+  }
+
+  .panel-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .panel-count {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .panel-body { padding: 24px; }
+
+  /* FORM */
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .form-label span {
+    color: var(--accent2);
+  }
+
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none;
+  }
+
+  .form-input:focus, .form-textarea:focus, .form-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(0,212,255,0.2), inset 0 0 20px rgba(0,212,255,0.03);
+  }
+
+  .form-textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
+
+  .form-select option { background: #0b1018; }
+
+  .time-inputs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .time-input-wrap { position: relative; }
+  .time-unit {
+    position: absolute;
+    right: 10px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  .form-input.time { padding-right: 36px; }
+
+  .unix-preview {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: 1px;
+    min-height: 16px;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    padding: 16px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .btn-submit:hover {
+    background: #33ddff;
+    box-shadow: 0 0 40px rgba(0,212,255,0.3);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 9998;
+    padding: 16px 24px;
+    border-left: 3px solid var(--accent3);
+    background: rgba(11,16,24,0.95);
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--text-bright);
+    backdrop-filter: blur(10px);
+    transform: translateX(120%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 340px;
+  }
+
+  .toast.show { transform: translateX(0); }
+  .toast.error { border-color: var(--accent2); }
+
+  /* PREDICTIONS LIST */
+  .predictions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .prediction-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+    animation: slideIn 0.4s ease both;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .prediction-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border-glow);
+    transition: background 0.2s;
+  }
+
+  .prediction-card:hover {
+    border-color: var(--border-glow);
+    background: rgba(0,212,255,0.02);
+  }
+
+  .prediction-card:hover::before {
+    background: var(--accent);
+  }
+
+  .prediction-card.locked::before { background: var(--accent2); }
+  .prediction-card.correct::before { background: var(--accent3); }
+  .prediction-card.wrong::before { background: #ff4444; }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .card-id {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .card-category {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    color: var(--accent);
+  }
+
+  .card-verdict {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    margin-left: auto;
+  }
+
+  .card-verdict.PENDING { color: var(--text-dim); border: 1px solid var(--border); }
+  .card-verdict.LOCKED { color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); }
+  .card-verdict.CORRECT { color: var(--accent3); border: 1px solid rgba(127,255,107,0.3); }
+  .card-verdict.WRONG { color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+
+  .card-content {
+    font-size: 13px;
+    color: var(--text-bright);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+
+  .card-content.locked-text {
+    color: var(--text-dim);
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .lock-icon {
+    font-size: 16px;
+    opacity: 0.5;
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .unlock-countdown {
+    color: var(--accent2);
+    font-size: 10px;
+  }
+
+  .verdict-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .verdict-btn:hover {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 14px 24px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab:hover:not(.active) {
+    color: var(--text);
+  }
+
+  /* STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .stat-box {
+    background: var(--surface);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: var(--sans);
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-bright);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .stat-box.accent .stat-value { color: var(--accent); }
+  .stat-box.green .stat-value { color: var(--accent3); }
+  .stat-box.orange .stat-value { color: var(--accent2); }
+
+  /* REPUTATION LOOKUP */
+  .rep-result {
+    margin-top: 20px;
+    display: none;
+  }
+
+  .rep-result.visible { display: block; }
+
+  .rep-bar {
+    height: 4px;
+    background: var(--border);
+    margin: 12px 0 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .rep-bar-fill {
+    position: absolute;
+    left: 0; top: 0; height: 100%;
+    background: var(--accent3);
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    padding: 60px 24px;
+    text-align: center;
+  }
+
+  .empty-icon {
+    font-size: 32px;
+    opacity: 0.2;
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  .empty-text {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  /* LOADING */
+  .loading {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .loading span {
+    width: 4px; height: 4px;
+    background: var(--accent);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  .loading span:nth-child(2) { animation-delay: 0.2s; }
+  .loading span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
+  /* VERDICT MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,9,16,0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-glow);
+    padding: 32px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 0 60px rgba(0,212,255,0.1);
+    transform: translateY(10px);
+    transition: transform 0.2s;
+  }
+
+  .modal-overlay.open .modal {
+    transform: translateY(0);
+  }
+
+  .modal-title {
+    font-family: var(--sans);
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+  }
+
+  .modal-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .verdict-correct {
+    padding: 16px;
+    background: rgba(127,255,107,0.08);
+    border: 1px solid rgba(127,255,107,0.3);
+    color: var(--accent3);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .verdict-correct:hover {
+    background: rgba(127,255,107,0.15);
+    box-shadow: 0 0 20px rgba(127,255,107,0.2);
+  }
+
+  .verdict-wrong {
+    padding: 16px;
+    background: rgba(255,68,68,0.08);
+    border: 1px solid rgba(255,68,68,0.3);
+    color: #ff4444;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .verdict-wrong:hover {
+    background: rgba(255,68,68,0.15);
+    box-shadow: 0 0 20px rgba(255,68,68,0.2);
+  }
+
+  .modal-cancel {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .modal-cancel:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* TICKER */
+  .ticker {
+    overflow: hidden;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .ticker-inner {
+    display: flex;
+    gap: 48px;
+    animation: scroll 20s linear infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .ticker-item {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .ticker-item span { color: var(--accent); margin-left: 8px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 960px) {
+    main { grid-template-columns: 1fr; padding: 0 24px 80px; }
+    header { padding: 24px; }
+    .hero { padding: 60px 24px 40px; }
+    .contract-badge { display: none; }
+  }
+
+  /* ANIMATIONS ON LOAD */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeUp 0.6s ease both;
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-up:nth-child(1) { animation-delay: 0.1s; }
+  .fade-up:nth-child(2) { animation-delay: 0.2s; }
+  .fade-up:nth-child(3) { animation-delay: 0.3s; }
+  .fade-up:nth-child(4) { animation-delay: 0.4s; }
+
+  .glitch {
+    position: relative;
+  }
+
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 2px; top: 0;
+    color: var(--accent2);
+    clip-path: polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+    opacity: 0;
+    animation: glitch 4s infinite;
+  }
+
+  @keyframes glitch {
+    0%, 95%, 100% { opacity: 0; transform: translateX(0); }
+    96% { opacity: 0.4; transform: translateX(-3px); }
+    97% { opacity: 0.4; transform: translateX(3px); }
+    98% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="noise"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- HEADER -->
+<header class="fade-up">
+  <div class="logo">
+    <span class="logo-tag">// stellar testnet</span>
+    <span class="logo-title glitch" data-text="PREDICTION CAPSULE">PREDICTION <span>CAPSULE</span></span>
+  </div>
+  <div class="header-right">
+    <div class="status-dot">
+      <div class="dot"></div>
+      <span>LIVE</span>
+    </div>
+    <div class="contract-badge">
+      CONTRACT <span>CCIQ...OA3N</span>
+    </div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner" id="ticker">
+    <span class="ticker-item">PREDICTIONS SEALED ON-CHAIN <span>◆</span></span>
+    <span class="ticker-item">TRUSTLESS FORECASTING <span>◆</span></span>
+    <span class="ticker-item">IMMUTABLE RECORDS <span>◆</span></span>
+    <span class="ticker-item">STELLAR SOROBAN <span>◆</span></span>
+    <span class="ticker-item">YOUR REPUTATION ON-CHAIN <span>◆</span></span>
+    <span class="ticker-item">NO ONE CAN EDIT THE PAST <span>◆</span></span>
+    <span class="ticker-item">PREDICTIONS SEALED ON-CHAIN <span>◆</span></span>
+    <span class="ticker-item">TRUSTLESS FORECASTING <span>◆</span></span>
+    <span class="ticker-item">IMMUTABLE RECORDS <span>◆</span></span>
+    <span class="ticker-item">STELLAR SOROBAN <span>◆</span></span>
+    <span class="ticker-item">YOUR REPUTATION ON-CHAIN <span>◆</span></span>
+    <span class="ticker-item">NO ONE CAN EDIT THE PAST <span>◆</span></span>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero fade-up">
+  <p class="hero-label">// on-chain prediction protocol</p>
+  <h1 class="hero-title">
+    SEAL YOUR<br>
+    <span class="line2">FORECAST.</span>
+  </h1>
+  <p class="hero-desc">
+    Submit predictions that are cryptographically locked until a future date.
+    No edits. No deletions. Your words, preserved forever on the Stellar blockchain.
+  </p>
+  <div class="hero-actions">
+    <button class="btn btn-primary" onclick="scrollToForm()">
+      ▶ SUBMIT PREDICTION
+    </button>
+    <button class="btn btn-ghost" onclick="loadPredictions()">
+      ↻ REFRESH FEED
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- LEFT: FEED + FORM -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+
+    <!-- SUBMIT FORM -->
+    <div class="panel fade-up" id="submit-section">
+      <div class="panel-header">
+        <span class="panel-title">// new prediction</span>
+        <span class="panel-count" id="form-status">READY</span>
+      </div>
+      <div class="panel-body">
+        <div class="form-group">
+          <label class="form-label">Your Address <span>*</span></label>
+          <input class="form-input" id="owner" placeholder="G... your Stellar address" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prediction <span>*</span></label>
+          <textarea class="form-textarea" id="content" placeholder="What do you predict will happen?"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category <span>*</span></label>
+          <select class="form-select" id="category">
+            <option value="crypto">Crypto</option>
+            <option value="politics">Politics</option>
+            <option value="tech">Technology</option>
+            <option value="sports">Sports</option>
+            <option value="science">Science</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unlock After <span>*</span></label>
+          <div class="time-inputs">
+            <div class="time-input-wrap">
+              <input class="form-input time" id="days" type="number" placeholder="0" min="0" oninput="updateUnixPreview()" />
+              <span class="time-unit">DAYS</span>
+            </div>
+            <div class="time-input-wrap">
+              <input class="form-input time" id="hours" type="number" placeholder="0" min="0" max="23" oninput="updateUnixPreview()" />
+              <span class="time-unit">HRS</span>
+            </div>
+            <div class="time-input-wrap">
+              <input class="form-input time" id="minutes" type="number" placeholder="0" min="0" max="59" oninput="updateUnixPreview()" />
+              <span class="time-unit">MIN</span>
+            </div>
+          </div>
+          <div class="unix-preview" id="unix-preview">↳ enter time to preview unlock timestamp</div>
+        </div>
+        <button class="btn-submit" id="submit-btn" onclick="submitPrediction()">
+          ▶ SEAL PREDICTION ON-CHAIN
+        </button>
+      </div>
+    </div>
+
+    <!-- PREDICTIONS FEED -->
+    <div class="panel fade-up">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('all', this)">All Predictions</button>
+        <button class="tab" onclick="switchTab('locked', this)">Locked</button>
+        <button class="tab" onclick="switchTab('revealed', this)">Revealed</button>
+      </div>
+      <div id="predictions-container">
+        <div class="loading">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- STATS -->
+    <div class="panel fade-up">
+      <div class="panel-header">
+        <span class="panel-title">// network stats</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box accent">
+          <span class="stat-value" id="stat-total">—</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="stat-locked">—</span>
+          <span class="stat-label">Locked</span>
+        </div>
+        <div class="stat-box green">
+          <span class="stat-value" id="stat-correct">—</span>
+          <span class="stat-label">Correct</span>
+        </div>
+        <div class="stat-box orange">
+          <span class="stat-value" id="stat-wrong">—</span>
+          <span class="stat-label">Wrong</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPUTATION LOOKUP -->
+    <div class="panel fade-up">
+      <div class="panel-header">
+        <span class="panel-title">// reputation lookup</span>
+      </div>
+      <div class="panel-body">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Stellar Address</label>
+          <input class="form-input" id="rep-address" placeholder="G... address to look up" />
+        </div>
+        <button class="btn-submit" style="margin-top: 0;" onclick="lookupReputation()">
+          ↳ LOOK UP
+        </button>
+        <div class="rep-result" id="rep-result">
+          <div class="divider"></div>
+          <div class="stats-grid">
+            <div class="stat-box accent" style="grid-column: 1/-1;">
+              <span class="stat-value" id="rep-total">0</span>
+              <span class="stat-label">Total Predictions</span>
+            </div>
+            <div class="stat-box green">
+              <span class="stat-value" id="rep-correct">0</span>
+              <span class="stat-label">Correct</span>
+            </div>
+            <div class="stat-box orange">
+              <span class="stat-value" id="rep-wrong">0</span>
+              <span class="stat-label">Wrong</span>
+            </div>
+          </div>
+          <div style="padding: 0 0 4px; margin-top: 16px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 6px;">
+              <span>ACCURACY</span>
+              <span id="rep-accuracy">—%</span>
+            </div>
+            <div class="rep-bar">
+              <div class="rep-bar-fill" id="rep-bar-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTRACT INFO -->
+    <div class="panel fade-up">
+      <div class="panel-header">
+        <span class="panel-title">// contract info</span>
+      </div>
+      <div class="panel-body" style="font-size: 11px; line-height: 2; color: var(--text-dim);">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
+          <span>NETWORK</span>
+          <span style="color: var(--accent3);">TESTNET</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
+          <span>PLATFORM</span>
+          <span style="color: var(--text);">STELLAR SOROBAN</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
+          <span>LANGUAGE</span>
+          <span style="color: var(--text);">RUST</span>
+        </div>
+        <div style="margin-top: 4px;">
+          <span style="display: block; margin-bottom: 6px; letter-spacing: 2px;">CONTRACT ID</span>
+          <span style="color: var(--accent); font-size: 9px; word-break: break-all; letter-spacing: 1px;">CCIQGZVEYMP2WHHWN7K2UDA5IC62ZGXLRUZUC7ZSJUODRKNHVMRKOA3N</span>
+        </div>
+        <div style="margin-top: 16px;">
+          <a href="https://stellar.expert/explorer/testnet/contract/CCIQGZVEYMP2WHHWN7K2UDA5IC62ZGXLRUZUC7ZSJUODRKNHVMRKOA3N"
+            target="_blank"
+            style="color: var(--accent); text-decoration: none; font-size: 10px; letter-spacing: 2px; display: inline-flex; align-items: center; gap: 6px;">
+            ↗ VIEW ON STELLAREXPERT
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- VERDICT MODAL -->
+<div class="modal-overlay" id="verdict-modal">
+  <div class="modal">
+    <div class="modal-title">Submit Verdict</div>
+    <p class="modal-sub" id="modal-content-preview"></p>
+    <div class="modal-actions">
+      <button class="verdict-correct" onclick="confirmVerdict(true)">✓ CORRECT</button>
+      <button class="verdict-wrong" onclick="confirmVerdict(false)">✗ WRONG</button>
+    </div>
+    <button class="modal-cancel" onclick="closeModal()">CANCEL</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const CONTRACT_ID = 'CCIQGZVEYMP2WHHWN7K2UDA5IC62ZGXLRUZUC7ZSJUODRKNHVMRKOA3N';
+const RPC_URL = 'https://soroban-testnet.stellar.org';
+
+let allPredictions = [];
+let currentTab = 'all';
+let pendingVerdictId = null;
+let pendingVerdictCaller = null;
+
+// ── UTILS ──────────────────────────────────────────
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(() => { t.className = 'toast' + (isError ? ' error' : ''); }, 4000);
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+function timeUntil(ts) {
+  const diff = ts - Math.floor(Date.now() / 1000);
+  if (diff <= 0) return 'UNLOCKED';
+  if (diff < 60) return `${diff}s remaining`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m remaining`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h remaining`;
+  return `${Math.floor(diff/86400)}d remaining`;
+}
+
+function updateUnixPreview() {
+  const d = parseInt(document.getElementById('days').value) || 0;
+  const h = parseInt(document.getElementById('hours').value) || 0;
+  const m = parseInt(document.getElementById('minutes').value) || 0;
+  const total = d * 86400 + h * 3600 + m * 60;
+  if (total > 0) {
+    const ts = Math.floor(Date.now() / 1000) + total;
+    const date = new Date(ts * 1000);
+    document.getElementById('unix-preview').textContent =
+      `↳ unlocks at unix:${ts} · ${date.toLocaleString()}`;
+  } else {
+    document.getElementById('unix-preview').textContent = '↳ enter time to preview unlock timestamp';
+  }
+}
+
+function scrollToForm() {
+  document.getElementById('submit-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function switchTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderPredictions();
+}
+
+// ── MOCK DATA (replace with actual contract calls) ──
+function getMockPredictions() {
+  const now = Math.floor(Date.now() / 1000);
+  return [
+    {
+      id: 0,
+      owner: 'GAIHJU...MJPQFE',
+      content: 'Bitcoin will surpass $200,000 USD before the end of 2025.',
+      category: 'crypto',
+      unlock_time: now - 3600,
+      created_at: now - 86400,
+      verdict: 'PENDING'
+    },
+    {
+      id: 1,
+      owner: 'GAIHJU...MJPQFE',
+      content: 'LOCKED',
+      category: 'tech',
+      unlock_time: now + 86400 * 7,
+      created_at: now - 3600,
+      verdict: 'LOCKED'
+    },
+    {
+      id: 2,
+      owner: 'GAIHJU...MJPQFE',
+      content: 'Stellar (XLM) will be integrated into at least 3 major payment processors by Q3 2025.',
+      category: 'crypto',
+      unlock_time: now - 86400 * 2,
+      created_at: now - 86400 * 10,
+      verdict: 'CORRECT'
+    },
+    {
+      id: 3,
+      owner: 'GAIHJU...MJPQFE',
+      content: 'LOCKED',
+      category: 'politics',
+      unlock_time: now + 86400 * 30,
+      created_at: now - 7200,
+      verdict: 'LOCKED'
+    }
+  ];
+}
+
+// ── RENDER ─────────────────────────────────────────
+function renderPredictions() {
+  const container = document.getElementById('predictions-container');
+  let list = allPredictions;
+
+  if (currentTab === 'locked') list = list.filter(p => p.verdict === 'LOCKED');
+  if (currentTab === 'revealed') list = list.filter(p => p.verdict !== 'LOCKED');
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">◎</span>
+        <p class="empty-text">No predictions found</p>
+      </div>`;
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  container.innerHTML = `<div class="predictions-list">` +
+    list.map((p, i) => {
+      const isLocked = p.verdict === 'LOCKED';
+      const isUnlocked = now >= p.unlock_time;
+      const canVerdict = isUnlocked && p.verdict === 'PENDING';
+
+      return `
+      <div class="prediction-card ${isLocked ? 'locked' : p.verdict.toLowerCase()}"
+           style="animation-delay: ${i * 0.05}s">
+        <div class="card-meta">
+          <span class="card-id">#${String(p.id).padStart(4,'0')}</span>
+          <span class="card-category">${p.category}</span>
+          <span class="card-verdict ${p.verdict}">${p.verdict}</span>
+        </div>
+        <div class="card-content ${isLocked ? 'locked-text' : ''}">
+          ${isLocked ? `<span class="lock-icon">⬡</span> Content sealed until unlock date` : p.content}
+        </div>
+        <div class="card-footer">
+          <span>${timeAgo(p.created_at)}</span>
+          ${isLocked
+            ? `<span class="unlock-countdown">${timeUntil(p.unlock_time)}</span>`
+            : canVerdict
+              ? `<button class="verdict-btn" onclick="openVerdictModal(${p.id}, '${p.owner}', \`${p.content}\`)">SUBMIT VERDICT</button>`
+              : `<span style="color: var(--text-dim); font-size: 10px;">${p.owner.slice(0,10)}...</span>`
+          }
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+
+  updateStats();
+}
+
+function updateStats() {
+  const total = allPredictions.length;
+  const locked = allPredictions.filter(p => p.verdict === 'LOCKED').length;
+  const correct = allPredictions.filter(p => p.verdict === 'CORRECT').length;
+  const wrong = allPredictions.filter(p => p.verdict === 'WRONG').length;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-locked').textContent = locked;
+  document.getElementById('stat-correct').textContent = correct;
+  document.getElementById('stat-wrong').textContent = wrong;
+}
+
+function loadPredictions() {
+  const container = document.getElementById('predictions-container');
+  container.innerHTML = `<div class="loading"><span></span><span></span><span></span></div>`;
+
+  setTimeout(() => {
+    allPredictions = getMockPredictions();
+    renderPredictions();
+    showToast('Feed updated successfully');
+  }, 800);
+}
+
+// ── SUBMIT ─────────────────────────────────────────
+function submitPrediction() {
+  const owner = document.getElementById('owner').value.trim();
+  const content = document.getElementById('content').value.trim();
+  const category = document.getElementById('category').value;
+  const d = parseInt(document.getElementById('days').value) || 0;
+  const h = parseInt(document.getElementById('hours').value) || 0;
+  const m = parseInt(document.getElementById('minutes').value) || 0;
+  const totalSecs = d * 86400 + h * 3600 + m * 60;
+
+  if (!owner) { showToast('Address is required', true); return; }
+  if (!owner.startsWith('G')) { showToast('Enter a valid Stellar address (starts with G)', true); return; }
+  if (!content) { showToast('Prediction content is required', true); return; }
+  if (totalSecs === 0) { showToast('Set an unlock time in the future', true); return; }
+
+  const unlock_time = Math.floor(Date.now() / 1000) + totalSecs;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '▶ SEALING...';
+  document.getElementById('form-status').textContent = 'PROCESSING';
+
+  // Simulate contract call
+  setTimeout(() => {
+    const newPred = {
+      id: allPredictions.length,
+      owner: owner.slice(0,6) + '...' + owner.slice(-6),
+      content,
+      category,
+      unlock_time,
+      created_at: Math.floor(Date.now() / 1000),
+      verdict: 'LOCKED'
+    };
+    allPredictions.unshift(newPred);
+    renderPredictions();
+
+    btn.disabled = false;
+    btn.textContent = '▶ SEAL PREDICTION ON-CHAIN';
+    document.getElementById('form-status').textContent = 'READY';
+
+    document.getElementById('owner').value = '';
+    document.getElementById('content').value = '';
+    document.getElementById('days').value = '';
+    document.getElementById('hours').value = '';
+    document.getElementById('minutes').value = '';
+    document.getElementById('unix-preview').textContent = '↳ enter time to preview unlock timestamp';
+
+    showToast('✓ Prediction sealed on-chain successfully');
+  }, 1500);
+}
+
+// ── VERDICT ────────────────────────────────────────
+function openVerdictModal(id, caller, content) {
+  pendingVerdictId = id;
+  pendingVerdictCaller = caller;
+  document.getElementById('modal-content-preview').textContent =
+    `"${content.slice(0, 120)}${content.length > 120 ? '...' : ''}"`;
+  document.getElementById('verdict-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('verdict-modal').classList.remove('open');
+  pendingVerdictId = null;
+  pendingVerdictCaller = null;
+}
+
+function confirmVerdict(isCorrect) {
+  if (pendingVerdictId === null) return;
+  const idx = allPredictions.findIndex(p => p.id === pendingVerdictId);
+  if (idx !== -1) {
+    allPredictions[idx].verdict = isCorrect ? 'CORRECT' : 'WRONG';
+    renderPredictions();
+    showToast(`Verdict recorded: ${isCorrect ? 'CORRECT ✓' : 'WRONG ✗'}`);
+  }
+  closeModal();
+}
+
+// ── REPUTATION ─────────────────────────────────────
+function lookupReputation() {
+  const addr = document.getElementById('rep-address').value.trim();
+  if (!addr) { showToast('Enter an address to look up', true); return; }
+
+  // Simulate lookup
+  setTimeout(() => {
+    const total = Math.floor(Math.random() * 20) + 1;
+    const correct = Math.floor(Math.random() * total);
+    const wrong = total - correct - Math.floor(Math.random() * 3);
+    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    document.getElementById('rep-total').textContent = total;
+    document.getElementById('rep-correct').textContent = correct;
+    document.getElementById('rep-wrong').textContent = Math.max(0, wrong);
+    document.getElementById('rep-accuracy').textContent = accuracy + '%';
+
+    const result = document.getElementById('rep-result');
+    result.classList.add('visible');
+
+    setTimeout(() => {
+      document.getElementById('rep-bar-fill').style.width = accuracy + '%';
+    }, 100);
+
+    showToast('Reputation loaded');
+  }, 600);
+}
+
+// ── INIT ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadPredictions();
+});
+
+// Close modal on overlay click
+document.getElementById('verdict-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+</body>
+</html>
